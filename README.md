@@ -1,4 +1,4 @@
-# Be aa breeze (TMAC's chain) witness in minutes.
+# Be a breeze (TMAC's chain) witness in minutes.
 # You will be an observer node by default.
 
 # Only top 15(may expand in tiers in future) elected nodes can mine dtube blocks on breeze chain.
