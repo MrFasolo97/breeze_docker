@@ -113,9 +113,7 @@ function getCurTime() {
     var s = String(td.getSeconds()).padStart(2, '0')
 
     var dt = y + "/" + m + "/" + d + " " + h + ":" + mn + ":" + s
-    logr.info("\n")
-    logr.info("Current Time = ", dt)
-    logr.info("--------------------------------------------------")
+    return dt
 }
 
 var exec = require('child_process').exec;
@@ -144,6 +142,16 @@ function sleep (time) {
 
 function replayFromSelfBackup() {
     backupUrl = config.mongodbPath + "/backup"
+}
+
+function checkBlocksFlow() {
+    const blocks = mongo.getHeadBlock()
+    sleep(5000)
+    if (mongo.getHeadBlock() > blocks) {
+        return true
+    } else {
+        return false
+    }
 }
 
 async function getGenesisBlocks() {
@@ -257,10 +265,12 @@ function checkHeightAndRun() {
     axios.get(url + '/count').then((bHeight) => {
         curbHeight = bHeight.data.count
 
-        getCurTime()
-
-        logr.info('Previous block height = ', prevbHeight)
-        logr.info('Current block height  = ', curbHeight)
+        let dt = getCurTime()
+        logr.debug("\n")
+        logr.debug("Current Time = ", dt)
+        logr.debug("--------------------------------------------------")
+        logr.debug('Previous block height = ', prevbHeight)
+        logr.debug('Current block height  = ', curbHeight)
 
         if(createNet) {
             if (prevbHeight == curbHeight) {
@@ -361,14 +371,14 @@ function checkHeightAndRun() {
             }
         }
         if (rebuildState == 0 && replayState == 0 && ! rebuildUnfinished) {
-            checkRestartCmd = ""
-            restartMongoDB = "if [[ ! $(ps aux | grep -v grep | grep -v defunct | grep 'mongod --dbpath') ]]; then mongod --dbpath /data/db >> /breeze/log/mongo.log 2>&1; fi && sleep 20"
+            restartMongoDB = "if [[ ! $(ps aux | grep -v grep | grep -v defunct | grep 'mongod --dbpath') ]]; then mongod --dbpath /data/db >> /breeze/log/mongo.log 2>&1; fi"
             restartBreeze = "if [[ ! $(ps aux | grep -v grep | grep -v defunct | grep src/main) ]]; then `" + config.scriptPath + " >> " + config.logPath + " 2>1&" + "`; fi;"
 
-            checkRestartCmd = restartMongoDB + " && "
-            checkRestartCmd += "echo '"+mongo.getHeadBlock()+"' > tmp.out 2>&1 && a=$(cat tmp.out) && sleep 15 && echo '"+mongo.getHeadBlock()+"' > tmp2.out 2>&1 && b=$(cat tmp2.out) && sleep 2 && if [ \"$a\" == \"$b\" ] ; then "+restartBreeze+" fi;"
-            logr.debug("Check restart command = " + checkRestartCmd)
-            runCmd(checkRestartCmd)
+            runCmd(restartMongoDB)
+            if(! checkBlocksFlow()) {
+                logr.warn("Restarting as we are at same block height as 5 seconds ago!")
+                runCmd(restartBreeze)
+            }
         }
     })
     if (rebuildState == 0 && replayState == 0)
